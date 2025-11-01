@@ -4,6 +4,7 @@ from flask import Flask, render_template, jsonify, request, abort, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
+import logging
 
 # Load environment variables from .env if present
 env_path = Path(__file__).parent / '.env'
@@ -20,6 +21,10 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 db = SQLAlchemy(app)
+
+# configure simple logging to stderr
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Simple Product model
 class Product(db.Model):
@@ -96,7 +101,12 @@ def create_product():
 
 	product = Product(name=name, price=price_val, image_url=image_url)
 	db.session.add(product)
-	db.session.commit()
+	try:
+		db.session.commit()
+	except Exception as e:
+		logger.exception('Failed to create product')
+		db.session.rollback()
+		return jsonify({'error': 'internal error', 'detail': str(e)}), 500
 	return jsonify(product.to_dict()), 201
 
 
@@ -107,7 +117,12 @@ def delete_product(product_id):
 
 	product = Product.query.get_or_404(product_id)
 	db.session.delete(product)
-	db.session.commit()
+	try:
+		db.session.commit()
+	except Exception as e:
+		logger.exception('Failed to delete product %s', product_id)
+		db.session.rollback()
+		return jsonify({'error': 'internal error', 'detail': str(e)}), 500
 	return jsonify({'status': 'deleted'})
 
 
