@@ -1,6 +1,6 @@
 from pathlib import Path
 from dotenv import load_dotenv
-from flask import Flask, render_template, jsonify, request, abort
+from flask import Flask, render_template, jsonify, request, abort, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
@@ -16,6 +16,8 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:///{BASE_DIR / "data.db"}')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 db = SQLAlchemy(app)
 
@@ -37,11 +39,30 @@ class Product(db.Model):
 		}
 
 
-def check_admin_auth(req):
-	"""Return True if request has valid admin credentials."""
-	header = req.headers.get('X-ADMIN-PASS')
+def is_admin_logged_in():
+	return session.get('is_admin') is True
+
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+	data = request.get_json() or {}
+	password = data.get('password')
 	env_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
-	return header is not None and header == env_pass
+	if password and password == env_pass:
+		session['is_admin'] = True
+		return jsonify({'status': 'ok'})
+	return jsonify({'error': 'invalid credentials'}), 401
+
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+	session.pop('is_admin', None)
+	return jsonify({'status': 'ok'})
+
+
+@app.route('/api/me')
+def api_me():
+	return jsonify({'is_admin': is_admin_logged_in()})
 
 
 @app.route('/')
@@ -57,7 +78,7 @@ def list_products():
 
 @app.route('/api/products', methods=['POST'])
 def create_product():
-	if not check_admin_auth(request):
+	if not is_admin_logged_in():
 		return jsonify({'error': 'unauthorized'}), 401
 
 	data = request.get_json() or {}
@@ -81,7 +102,7 @@ def create_product():
 
 @app.route('/api/products/<int:product_id>', methods=['DELETE'])
 def delete_product(product_id):
-	if not check_admin_auth(request):
+	if not is_admin_logged_in():
 		return jsonify({'error': 'unauthorized'}), 401
 
 	product = Product.query.get_or_404(product_id)

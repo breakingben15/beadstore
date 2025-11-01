@@ -57,6 +57,9 @@
       <!-- Admin Page (Hidden) -->
       <div id="admin-page" class="page hidden">
         <h2 class="text-3xl font-bold mb-6 text-gray-800">Admin - Manage Baubles</h2>
+        <div class="mb-4 text-right">
+          <button id="admin-logout-btn" class="bg-red-500 text-white py-2 px-4 rounded">Logout</button>
+        </div>
         <form id="admin-form" class="bg-white p-6 rounded-lg shadow-lg space-y-4 max-w-lg mx-auto">
           <input type="hidden" id="product-id">
           <div>
@@ -223,7 +226,7 @@
     </footer>
 
     <script>
-      document.addEventListener('DOMContentLoaded', () => {
+      document.addEventListener('DOMContentLoaded', async () => {
         // --- ELEMENT SELECTORS ---
         const homePage = document.getElementById('home-page');
         const adminPage = document.getElementById('admin-page');
@@ -244,8 +247,9 @@
         const cartEmptyMessage = document.getElementById('cart-empty-message');
         const cartSummaryEl = document.getElementById('cart-summary');
         const checkoutButton = document.getElementById('checkout-button');
-        const adminLoginForm = document.getElementById('admin-login-form');
-        const adminLoginError = document.getElementById('admin-login-error');
+  const adminLoginForm = document.getElementById('admin-login-form');
+  const adminLoginError = document.getElementById('admin-login-error');
+  const adminLogoutBtn = document.getElementById('admin-logout-btn');
         const checkoutForm = document.getElementById('checkout-form');
         const checkoutSummaryItems = document.getElementById('checkout-summary-items');
         const checkoutSubtotal = document.getElementById('checkout-subtotal');
@@ -305,18 +309,49 @@
         document.querySelector('nav a[href="#home-page"]').classList.add('text-indigo-600', 'font-bold');
         showPage('home-page');
 
-        // --- ADMIN LOGIN ---
-        adminLoginForm.addEventListener('submit', (e) => {
+        // --- ADMIN LOGIN (server-backed) ---
+        async function refreshAuth() {
+          try {
+            const res = await fetch('/api/me');
+            const info = await res.json();
+            window.__isAdmin = info.is_admin === true;
+            // show admin page if already on admin-login or admin page
+            if (window.__isAdmin && document.querySelector('nav a[href="#admin-page"]').classList.contains('font-bold')) {
+              showPage('admin-page');
+            }
+            renderProducts();
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        adminLoginForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           const password = document.getElementById('admin-password').value;
-          if (password === ADMIN_PASSWORD) {
-            showPage('admin-page');
+          try {
+            const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+            if (!res.ok) {
+              adminLoginError.classList.remove('hidden');
+              return;
+            }
             adminLoginError.classList.add('hidden');
             adminLoginForm.reset();
-          } else {
+            await refreshAuth();
+            showPage('admin-page');
+          } catch (err) {
             adminLoginError.classList.remove('hidden');
           }
         });
+
+        // Optional logout button on admin page
+        if (adminLogoutBtn) {
+          adminLogoutBtn.addEventListener('click', async () => {
+            await fetch('/api/logout', { method: 'POST' });
+            window.__isAdmin = false;
+            showPage('home-page');
+            renderProducts();
+          });
+        }
 
         // --- PRODUCT MANAGEMENT ---
         function renderProducts() {
@@ -324,14 +359,18 @@
           products.forEach(product => {
             const productCard = document.createElement('div');
             productCard.className = 'bg-white rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105';
+            const deleteBtnHtml = (window.__isAdmin) ? `<button onclick="deleteProduct(${product.id})" class="bg-red-500 text-white font-bold py-3 px-4 rounded">Delete</button>` : '';
             productCard.innerHTML = `
               <img src="${product.imageUrl || 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=No+Image'}" alt="${product.name}" class="w-full h-64 object-cover" onerror="this.src='https://placehold.co/600x400/e2e8f0/cbd5e0?text=Image+Not+Found'">
               <div class="p-6">
                 <h3 class="text-2xl font-bold mb-2">${product.name}</h3>
                 <p class="text-xl font-semibold text-indigo-600 mb-4">$${product.price.toFixed(2)}</p>
-                <button onclick="addToCart(${product.id})" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">
-                  Add to Cart
-                </button>
+                <div class="flex gap-2">
+                  <button onclick="addToCart(${product.id})" class="flex-1 bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">
+                    Add to Cart
+                  </button>
+                  ${deleteBtnHtml}
+                </div>
               </div>
             `;
             productGrid.appendChild(productCard);
@@ -499,8 +538,20 @@
           showPage('home-page');
         });
 
+        // --- DATA LOADING ---
+        async function loadProducts() {
+          try {
+            const res = await fetch('/api/products');
+            products = await res.json();
+            renderProducts();
+          } catch (err) {
+            console.error('Failed to load products', err);
+          }
+        }
+
         // --- INITIAL RENDER ---
-        renderProducts();
+        await refreshAuth();
+        await loadProducts();
         updateCart();
       });
     </script>
