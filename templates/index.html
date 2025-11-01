@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beaded Baubles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      .page {
+        animation: fadeIn 0.5s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 text-gray-900">
+
+    <!-- Header -->
+    <header class="bg-white/90 backdrop-blur-md shadow-md fixed top-0 left-0 right-0 z-50">
+      <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-indigo-600">
+          <a href="#home-page">Beaded Baubles</a>
+        </h1>
+        <div class="flex items-center space-x-6">
+          <a href="#home-page" class="text-gray-600 hover:text-indigo-600 transition-colors">Home</a>
+          <a href="#admin-page" class="text-gray-600 hover:text-indigo-600 transition-colors">Admin</a>
+          <a href="#cart-page" class="relative text-gray-600 hover:text-indigo-600 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            <span id="cart-count" class="absolute -top-2 -right-3 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
+          </a>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Notification -->
+    <div id="notification" class="hidden fixed top-24 right-4 bg-green-500 text-white py-3 px-6 rounded-lg shadow-lg z-50 transition-all duration-300 ease-in-out">
+      Item added successfully!
+    </div>
+
+    <!-- Main Content -->
+    <main class="container mx-auto mt-28 mb-16 p-4">
+      
+      <!-- Home Page -->
+      <div id="home-page" class="page">
+        <h2 class="text-3xl font-bold mb-6 text-gray-800">Our Collection</h2>
+        <div id="product-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <!-- Products will be injected here -->
+        </div>
+      </div>
+
+      <!-- Admin Page (Hidden) -->
+      <div id="admin-page" class="page hidden">
+        <h2 class="text-3xl font-bold mb-6 text-gray-800">Admin - Manage Baubles</h2>
+        <form id="admin-form" class="bg-white p-6 rounded-lg shadow-lg space-y-4 max-w-lg mx-auto">
+          <input type="hidden" id="product-id">
+          <div>
+            <label for="product-name" class="block text-sm font-medium text-gray-700">Bauble Name</label>
+            <input type="text" id="product-name" placeholder="e.g., 'Ruby Red Earrings'" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+          </div>
+          <div>
+            <label for="product-price" class="block text-sm font-medium text-gray-700">Price</label>
+            <input type="number" id="product-price" step="0.01" placeholder="e.g., '19.99'" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+          </div>
+          <div>
+            <label for="product-image-url" class="block text-sm font-medium text-gray-700">Image URL</label>
+            <input type="text" id="product-image-url" placeholder="e.g., 'https://placehold.co/...'
+" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+          </div>
+          <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">
+            Save Bauble
+          </button>
+        </form>
+      </div>
+
+      <!-- Cart Page -->
+      <div id="cart-page" class="page hidden">
+        <h2 class="text-3xl font-bold mb-6 text-gray-800">Your Cart</h2>
+        <div id="cart-items-container" class="space-y-4">
+          <!-- Cart items will be injected here -->
+        </div>
+        <div id="cart-empty-message" class="text-center text-gray-500 py-8 hidden">
+          Your cart is empty.
+        </div>
+        <div id="cart-summary" class="mt-8 pt-4 border-t border-gray-200">
+          <h3 class="text-2xl font-bold text-right">Total: $<span id="cart-total">0.00</span></h3>
+          <div class="flex justify-end mt-6">
+            <button id="checkout-button" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300 disabled:bg-gray-400">
+              Proceed to Checkout
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Login Page -->
+      <div id="admin-login-page" class="page hidden">
+        <div class="max-w-md mx-auto mt-20">
+          <form id="admin-login-form" class="bg-white p-8 rounded-lg shadow-2xl">
+            <h2 class="text-3xl font-bold mb-6 text-center text-gray-800">Admin Login</h2>
+            <div class="mb-4">
+              <label for="admin-password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input type="password" id="admin-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+            </div>
+            <p id="admin-login-error" class="text-red-500 text-sm mb-4 hidden">Incorrect password. Please try again.</p>
+            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">
+              Login
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Checkout Page -->
+      <div id="checkout-page" class="page hidden">
+        <h2 class="text-3xl font-bold mb-6 text-gray-800">Checkout</h2>
+        <div class="flex flex-col lg:flex-row gap-8">
+          <!-- Checkout Form -->
+          <div class="flex-grow">
+            <form id="checkout-form" class="bg-white p-8 rounded-lg shadow-lg space-y-4">
+              <h3 class="text-2xl font-semibold mb-4 text-gray-700">Shipping Information</h3>
+              <div>
+                <label for="checkout-name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                <input type="text" id="checkout-name" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+              </div>
+              <div>
+                <label for="checkout-email" class="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" id="checkout-email" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+              </div>
+              <div>
+                <label for="checkout-street1" class="block text-sm font-medium text-gray-700">Street Address</label>
+                <input type="text" id="checkout-street1" placeholder="123 Main St" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+              </div>
+              <div>
+                <label for="checkout-street2" class="block text-sm font-medium text-gray-700">Apt, suite, etc. (optional)</label>
+                <input type="text" id="checkout-street2" placeholder="Apt 4B" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div class="flex flex-col sm:flex-row gap-4">
+                <div class="flex-1">
+                  <label for="checkout-city" class="block text-sm font-medium text-gray-700">City</label>
+                  <input type="text" id="checkout-city" placeholder="New York" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <div class="w-full sm:w-1/3">
+                  <label for="checkout-state" class="block text-sm font-medium text-gray-700">State</label>
+                  <input type="text" id="checkout-state" placeholder="NY" maxlength="2" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <div class="w-full sm:w-1/3">
+                  <label for="checkout-zip" class="block text-sm font-medium text-gray-700">Zip Code</label>
+                  <input type="text" id="checkout-zip" placeholder="10001" inputmode="numeric" pattern="[0-9]{5}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+              </div>
+              
+              <h3 class="text-2xl font-semibold pt-6 mb-4 text-gray-700">Payment Details</h3>
+              <div>
+                <label for="checkout-card" class="block text-sm font-medium text-gray-700">Card Number</label>
+                <input type="text" id="checkout-card" placeholder="•••• •••• •••• ••••" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+              </div>
+              <div class="flex gap-4">
+                <div class="flex-1">
+                  <label for="checkout-expiry" class="block text-sm font-medium text-gray-700">Expiry (MM/YY)</label>
+                  <input type="text" id="checkout-expiry" placeholder="MM/YY" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <div class="flex-1">
+                  <label for="checkout-cvc" class="block text-sm font-medium text-gray-700">CVC</label>
+                  <input type="text" id="checkout-cvc" placeholder="•••" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+              </div>
+            </form>
+          </div>
+          <!-- Order Summary -->
+          <div class="w-full lg:w-1/3">
+            <div class="bg-white p-8 rounded-lg shadow-lg sticky top-28">
+              <h3 class="text-2xl font-semibold mb-4 text-gray-700">Order Summary</h3>
+              <div id="checkout-summary-items" class="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                <!-- Checkout summary items here -->
+              </div>
+              <div class="border-t border-gray-200 pt-4 space-y-2">
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Subtotal</span>
+                  <span id="checkout-subtotal" class="font-medium">$0.00</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Shipping</span>
+                  <span class="font-medium">$5.00</span>
+                </div>
+                <div class="flex justify-between text-xl font-bold text-gray-900">
+                  <span>Total</span>
+                  <span id="checkout-total">$0.00</span>
+                </div>
+              </div>
+              <button type="submit" form="checkout-form" class="w-full mt-6 bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300">
+                Place Order
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Confirmation Page -->
+      <div id="order-confirmation-page" class="page hidden">
+        <div class="max-w-lg mx-auto mt-20 text-center">
+          <div class="bg-white p-10 rounded-lg shadow-2xl">
+            <svg class="w-20 h-20 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <h2 class="text-3xl font-bold mb-4 text-gray-800">Order Confirmed!</h2>
+            <p class="text-gray-600 mb-6">Thank you for your purchase. A confirmation email has been sent to you.</p>
+            <button id="back-to-home-btn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">
+              Continue Shopping
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-16">
+      <div class="container mx-auto px-4 py-6 text-center text-gray-500">
+        &copy; 2025 Beaded Baubles. All rights reserved.
+      </div>
+    </footer>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        // --- ELEMENT SELECTORS ---
+        const homePage = document.getElementById('home-page');
+        const adminPage = document.getElementById('admin-page');
+        const cartPage = document.getElementById('cart-page');
+        const adminLoginPage = document.getElementById('admin-login-page');
+        const checkoutPage = document.getElementById('checkout-page');
+        const orderConfirmationPage = document.getElementById('order-confirmation-page');
+        const notification = document.getElementById('notification');
+
+        const pages = [homePage, adminPage, cartPage, adminLoginPage, checkoutPage, orderConfirmationPage];
+
+        const navLinks = document.querySelectorAll('nav a');
+        const productGrid = document.getElementById('product-grid');
+        const adminForm = document.getElementById('admin-form');
+        const cartCountEl = document.getElementById('cart-count');
+        const cartItemsContainer = document.getElementById('cart-items-container');
+        const cartTotalEl = document.getElementById('cart-total');
+        const cartEmptyMessage = document.getElementById('cart-empty-message');
+        const cartSummaryEl = document.getElementById('cart-summary');
+        const checkoutButton = document.getElementById('checkout-button');
+        const adminLoginForm = document.getElementById('admin-login-form');
+        const adminLoginError = document.getElementById('admin-login-error');
+        const checkoutForm = document.getElementById('checkout-form');
+        const checkoutSummaryItems = document.getElementById('checkout-summary-items');
+        const checkoutSubtotal = document.getElementById('checkout-subtotal');
+        const checkoutTotal = document.getElementById('checkout-total');
+        const backToHomeBtn = document.getElementById('back-to-home-btn');
+
+  // --- STATE ---
+  // The frontend now talks to the backend API for products.
+  // Admin actions send X-ADMIN-PASS header with the password configured on the server.
+  let products = [];
+        let cart = [];
+        
+        // --- UTILITY FUNCTIONS ---
+        function showNotification(message, isError = false) {
+          notification.textContent = message;
+          notification.classList.remove('hidden', 'bg-green-500', 'bg-red-500');
+          notification.classList.add(isError ? 'bg-red-500' : 'bg-green-500');
+          
+          setTimeout(() => {
+            notification.classList.add('hidden');
+          }, 3000); // Hide after 3 seconds
+        }
+
+        // --- PAGE NAVIGATION ---
+        function showPage(pageId) {
+          pages.forEach(page => {
+            if (page.id === pageId) {
+              page.classList.remove('hidden');
+            } else {
+              page.classList.add('hidden');
+            }
+          });
+          window.scrollTo(0, 0);
+        }
+
+        navLinks.forEach(link => {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            // FIX: Use e.currentTarget instead of e.target
+            // e.target could be the SVG or SPAN inside the <a> tag
+            const pageId = e.currentTarget.getAttribute('href').substring(1);
+            
+            if (pageId === 'admin-page') {
+              showPage('admin-login-page');
+            } else {
+              showPage(pageId);
+            }
+
+            // Highlight active link
+            navLinks.forEach(l => l.classList.remove('text-indigo-600', 'font-bold'));
+            // FIX: Use e.currentTarget here as well
+            e.currentTarget.classList.add('text-indigo-600', 'font-bold');
+          });
+        });
+
+        // Set home as default active link
+        document.querySelector('nav a[href="#home-page"]').classList.add('text-indigo-600', 'font-bold');
+        showPage('home-page');
+
+        // --- ADMIN LOGIN ---
+        adminLoginForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const password = document.getElementById('admin-password').value;
+          if (password === ADMIN_PASSWORD) {
+            showPage('admin-page');
+            adminLoginError.classList.add('hidden');
+            adminLoginForm.reset();
+          } else {
+            adminLoginError.classList.remove('hidden');
+          }
+        });
+
+        // --- PRODUCT MANAGEMENT ---
+        function renderProducts() {
+          productGrid.innerHTML = '';
+          products.forEach(product => {
+            const productCard = document.createElement('div');
+            productCard.className = 'bg-white rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105';
+            productCard.innerHTML = `
+              <img src="${product.imageUrl || 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=No+Image'}" alt="${product.name}" class="w-full h-64 object-cover" onerror="this.src='https://placehold.co/600x400/e2e8f0/cbd5e0?text=Image+Not+Found'">
+              <div class="p-6">
+                <h3 class="text-2xl font-bold mb-2">${product.name}</h3>
+                <p class="text-xl font-semibold text-indigo-600 mb-4">$${product.price.toFixed(2)}</p>
+                <button onclick="addToCart(${product.id})" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">
+                  Add to Cart
+                </button>
+              </div>
+            `;
+            productGrid.appendChild(productCard);
+          });
+        }
+
+        adminForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const payload = {
+            name: document.getElementById('product-name').value,
+            price: parseFloat(document.getElementById('product-price').value),
+            imageUrl: document.getElementById('product-image-url').value,
+          };
+
+          try {
+            const res = await fetch('/api/products', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-ADMIN-PASS': prompt('Enter admin password to create product') || ''
+              },
+              body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+              const err = await res.json();
+              showNotification(err.error || 'Failed to create product', true);
+              return;
+            }
+
+            const created = await res.json();
+            adminForm.reset();
+            showNotification('Bauble added successfully!');
+            await loadProducts();
+          } catch (err) {
+            showNotification('Network error', true);
+          }
+        });
+
+        // Delete product helper (used by admin list UI)
+        async function deleteProduct(id) {
+          try {
+            const res = await fetch(`/api/products/${id}`, {
+              method: 'DELETE',
+              headers: {
+                'X-ADMIN-PASS': prompt('Enter admin password to delete product') || ''
+              }
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              showNotification(err.error || 'Failed to delete', true);
+              return;
+            }
+            showNotification('Deleted');
+            await loadProducts();
+          } catch (err) {
+            showNotification('Network error', true);
+          }
+        }
+
+        // --- CART MANAGEMENT ---
+        // Made addToCart global by attaching to window so inline onclick can find it
+        window.addToCart = function(productId) {
+          const existingItem = cart.find(item => item.id === productId);
+          if (existingItem) {
+            existingItem.quantity++;
+          } else {
+            cart.push({ id: productId, quantity: 1 });
+          }
+          updateCart();
+          showNotification('Item added to cart!');
+        }
+
+        function updateCart() {
+          cartItemsContainer.innerHTML = '';
+          if (cart.length === 0) {
+            cartEmptyMessage.classList.remove('hidden');
+            cartSummaryEl.classList.add('hidden');
+          } else {
+            cartEmptyMessage.classList.add('hidden');
+            cartSummaryEl.classList.remove('hidden');
+
+            let total = 0;
+            cart.forEach(item => {
+              const product = products.find(p => p.id === item.id);
+              if (!product) return; // Safety check
+
+              total += product.price * item.quantity;
+              
+              const itemEl = document.createElement('div');
+              itemEl.className = 'flex justify-between items-center bg-gray-50 p-4 rounded-lg shadow-sm';
+              itemEl.innerHTML = `
+                <div class="flex items-center gap-4">
+                  <img src="${product.imageUrl}" alt="${product.name}" class="w-16 h-16 rounded-md object-cover">
+                  <div>
+                    <h4 class="font-bold text-lg">${product.name}</h4>
+                    <p class="text-gray-600">$${product.price.toFixed(2)} x ${item.quantity}</p>
+                  </div>
+                </div>
+                <span class="font-bold text-lg">$${(product.price * item.quantity).toFixed(2)}</span>
+              `;
+              cartItemsContainer.appendChild(itemEl);
+            });
+
+            cartTotalEl.textContent = total.toFixed(2);
+          }
+          
+          updateCartCount();
+          checkoutButton.disabled = cart.length === 0;
+        }
+
+        function updateCartCount() {
+          const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+          cartCountEl.textContent = totalItems;
+        }
+
+        // --- CHECKOUT FLOW ---
+        checkoutButton.addEventListener('click', () => {
+          renderCheckoutSummary();
+          showPage('checkout-page');
+        });
+
+        function renderCheckoutSummary() {
+          checkoutSummaryItems.innerHTML = '';
+          let subtotal = 0;
+          
+          cart.forEach(item => {
+            const product = products.find(p => p.id === item.id);
+            subtotal += product.price * item.quantity;
+            
+            const itemEl = document.createElement('div');
+            itemEl.className = 'flex justify-between text-sm';
+            itemEl.innerHTML = `
+              <div>
+                <span class="font-medium">${product.name}</span>
+                <span class="text-gray-500"> (x${item.quantity})</span>
+              </div>
+              <span class="font-medium">$${(product.price * item.quantity).toFixed(2)}</span>
+            `;
+            checkoutSummaryItems.appendChild(itemEl);
+          });
+          
+          const shipping = 5.00;
+          const total = subtotal + shipping;
+          
+          checkoutSubtotal.textContent = `$${subtotal.toFixed(2)}`;
+          checkoutTotal.textContent = `$${total.toFixed(2)}`;
+        }
+
+        checkoutForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          
+          // Clear the cart
+          cart = [];
+          updateCart();
+          
+          // Show confirmation
+          showPage('order-confirmation-page');
+          
+          // Reset checkout form
+          checkoutForm.reset();
+        });
+
+        backToHomeBtn.addEventListener('click', () => {
+          showPage('home-page');
+        });
+
+        // --- INITIAL RENDER ---
+        renderProducts();
+        updateCart();
+      });
+    </script>
+  </body>
+</html>
+
+
