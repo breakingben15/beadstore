@@ -329,7 +329,7 @@
           e.preventDefault();
           const password = document.getElementById('admin-password').value;
           try {
-            const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+            const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ password }) });
             if (!res.ok) {
               adminLoginError.classList.remove('hidden');
               return;
@@ -346,7 +346,7 @@
         // Optional logout button on admin page
         if (adminLogoutBtn) {
           adminLogoutBtn.addEventListener('click', async () => {
-            await fetch('/api/logout', { method: 'POST' });
+            await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
             window.__isAdmin = false;
             showPage('home-page');
             renderProducts();
@@ -389,9 +389,9 @@
             const res = await fetch('/api/products', {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/json',
-                'X-ADMIN-PASS': prompt('Enter admin password to create product') || ''
+                'Content-Type': 'application/json'
               },
+              credentials: 'same-origin',
               body: JSON.stringify(payload)
             });
 
@@ -415,9 +415,7 @@
           try {
             const res = await fetch(`/api/products/${id}`, {
               method: 'DELETE',
-              headers: {
-                'X-ADMIN-PASS': prompt('Enter admin password to delete product') || ''
-              }
+              credentials: 'same-origin'
             });
             if (!res.ok) {
               const err = await res.json();
