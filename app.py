@@ -136,3 +136,14 @@ if __name__ == '__main__':
 	debug = os.environ.get('FLASK_DEBUG', '1') == '1'
 	port = int(os.environ.get('PORT', os.environ.get('FLASK_RUN_PORT', 5000)))
 	app.run(host='127.0.0.1', port=port, debug=debug)
+
+
+# When running under a WSGI server (gunicorn / Render) the __main__ block
+# won't execute, so ensure tables exist before the first request.
+@app.before_first_request
+def ensure_tables():
+	try:
+		db.create_all()
+		logger.info('Database tables ensured')
+	except Exception:
+		logger.exception('Failed to create DB tables on startup')
