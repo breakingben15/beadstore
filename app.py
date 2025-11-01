@@ -139,11 +139,28 @@ if __name__ == '__main__':
 
 
 # When running under a WSGI server (gunicorn / Render) the __main__ block
-# won't execute, so ensure tables exist before the first request.
-@app.before_first_request
-def ensure_tables():
-	try:
-		db.create_all()
-		logger.info('Database tables ensured')
-	except Exception:
-		logger.exception('Failed to create DB tables on startup')
+# won't execute. Prefer `before_serving` (newer Flask) which runs once when
+# the server is ready; fall back to a guarded `before_request` that creates
+# tables only the first time to avoid calling create_all() on every request.
+if hasattr(app, 'before_serving'):
+	@app.before_serving
+	def ensure_tables_on_start():
+		try:
+			db.create_all()
+			logger.info('Database tables ensured (before_serving)')
+		except Exception:
+			logger.exception('Failed to create DB tables on startup (before_serving)')
+else:
+	# Fallback: run once on first request per process
+	def _ensure_tables_once():
+		if not getattr(app, '_tables_ensured', False):
+			try:
+				db.create_all()
+				app._tables_ensured = True
+				logger.info('Database tables ensured (before_request fallback)')
+			except Exception:
+				logger.exception('Failed to create DB tables on startup (before_request fallback)')
+
+	@app.before_request
+	def ensure_tables():
+		_ensure_tables_once()
