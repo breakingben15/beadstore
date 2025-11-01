@@ -26,7 +26,8 @@ db = SQLAlchemy(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Simple Product model
+# --- Models ---
+
 class Product(db.Model):
 	id = db.Column(db.Integer, primary_key=True)
 	name = db.Column(db.String(256), nullable=False)
@@ -43,10 +44,58 @@ class Product(db.Model):
 			'createdAt': self.created_at.isoformat()
 		}
 
+class Order(db.Model):
+	id = db.Column(db.Integer, primary_key=True)
+	created_at = db.Column(db.DateTime, default=datetime.utcnow)
+	# Customer Info
+	customer_name = db.Column(db.String(256), nullable=False)
+	customer_email = db.Column(db.String(256), nullable=False)
+	customer_street1 = db.Column(db.String(256), nullable=False)
+	customer_street2 = db.Column(db.String(256), nullable=True)
+	customer_city = db.Column(db.String(100), nullable=False)
+	customer_state = db.Column(db.String(100), nullable=False)
+	customer_zip = db.Column(db.String(20), nullable=False)
+	# Order Info
+	subtotal = db.Column(db.Float, nullable=False)
+	shipping_cost = db.Column(db.Float, nullable=False)
+	total_price = db.Column(db.Float, nullable=False)
+	items = db.relationship('OrderItem', backref='order', lazy=True, cascade="all, delete-orphan")
+
+	def to_dict(self):
+		return {
+			'id': self.id,
+			'createdAt': self.created_at.isoformat(),
+			'customerName': self.customer_name,
+			'customerEmail': self.customer_email,
+			'totalPrice': self.total_price,
+			'subtotal': self.subtotal,
+			'shippingCost': self.shipping_cost,
+			'items': [item.to_dict() for item in self.items]
+		}
+
+class OrderItem(db.Model):
+	id = db.Column(db.Integer, primary_key=True)
+	order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+	product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True) # Allow null if product is deleted
+	product_name = db.Column(db.String(256), nullable=False) # Store name at time of purchase
+	quantity = db.Column(db.Integer, nullable=False)
+	price_at_purchase = db.Column(db.Float, nullable=False) # Store price at time of purchase
+
+	def to_dict(self):
+		return {
+			'id': self.id,
+			'productId': self.product_id,
+			'productName': self.product_name,
+			'quantity': self.quantity,
+			'priceAtPurchase': self.price_at_purchase
+		}
+
+# --- Helper Functions ---
 
 def is_admin_logged_in():
 	return session.get('is_admin') is True
 
+# --- Auth Routes ---
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -69,11 +118,13 @@ def api_logout():
 def api_me():
 	return jsonify({'is_admin': is_admin_logged_in()})
 
+# --- Main Page ---
 
 @app.route('/')
 def index():
 	return render_template('index.html')
 
+# --- Product API ---
 
 @app.route('/api/products', methods=['GET'])
 def list_products():
@@ -125,13 +176,108 @@ def delete_product(product_id):
 		return jsonify({'error': 'internal error', 'detail': str(e)}), 500
 	return jsonify({'status': 'deleted'})
 
+# --- Order API ---
+
+@app.route('/api/orders', methods=['POST'])
+def create_order():
+	data = request.get_json() or {}
+	customer_info = data.get('customerInfo')
+	cart_items = data.get('cartItems')
+
+	if not customer_info or not cart_items:
+		return jsonify({'error': 'Missing customer info or cart items'}), 400
+	
+	required_fields = ['name', 'email', 'street1', 'city', 'state', 'zip']
+	if not all(customer_info.get(f) for f in required_fields):
+		return jsonify({'error': 'Missing required customer fields'}), 400
+
+	new_order_items = []
+	subtotal = 0.0
+
+	try:
+		# Verify products and prices from DB
+		for item in cart_items:
+			product_id = item.get('id')
+			quantity = item.get('quantity')
+			if not product_id or not quantity or quantity <= 0:
+				raise ValueError(f'Invalid cart item: {item}')
+			
+			product = Product.query.get(product_id)
+			if not product:
+				raise ValueError(f'Product with id {product_id} not found')
+
+			price_at_purchase = product.price
+			subtotal += price_at_purchase * quantity
+			
+			new_order_items.append(OrderItem(
+				product_id=product.id,
+				product_name=product.name,
+				quantity=quantity,
+				price_at_purchase=price_at_purchase
+			))
+
+		if not new_order_items:
+			return jsonify({'error': 'Cart cannot be empty'}), 400
+		
+		# Hardcoded shipping for this example
+		shipping_cost = 5.00
+		total_price = subtotal + shipping_cost
+
+		# Create the order
+		new_order = Order(
+			customer_name=customer_info['name'],
+			customer_email=customer_info['email'],
+			customer_street1=customer_info['street1'],
+			customer_street2=customer_info.get('street2'),
+			customer_city=customer_info['city'],
+			customer_state=customer_info['state'],
+			customer_zip=customer_info['zip'],
+			subtotal=subtotal,
+			shipping_cost=shipping_cost,
+			total_price=total_price
+		)
+		
+		# Add order and items to session
+		db.session.add(new_order)
+		# This associates items with the order *after* new_order gets its ID
+		for item in new_order_items:
+			item.order = new_order
+			db.session.add(item)
+		
+		db.session.commit()
+		
+		logger.info(f'Created new order {new_order.id} for {new_order.customer_email} with {len(new_order_items)} items.')
+
+		return jsonify(new_order.to_dict()), 201
+
+	except ValueError as e:
+		logger.warning(f'Validation error creating order: {e}')
+		db.session.rollback()
+		return jsonify({'error': str(e)}), 400
+	except Exception as e:
+		logger.exception('Failed to create order')
+		db.session.rollback()
+		return jsonify({'error': 'internal server error', 'detail': str(e)}), 500
+
+# You could also add an admin-only route to view orders
+@app.route('/api/orders', methods=['GET'])
+def list_orders():
+	if not is_admin_logged_in():
+		return jsonify({'error': 'unauthorized'}), 401
+	
+	orders = Order.query.order_by(Order.created_at.desc()).all()
+	return jsonify([o.to_dict() for o in orders])
+
+
+# --- App Start / DB Init ---
 
 if __name__ == '__main__':
 	# Ensure DB exists when running locally
-	try:
-		db.create_all()
-	except Exception:
-		pass
+	with app.app_context():
+		try:
+			db.create_all()
+		except Exception:
+			pass
 
 	debug = os.environ.get('FLASK_DEBUG', '1') == '1'
 	port = int(os.environ.get('PORT', os.environ.get('FLASK_RUN_PORT', 5000)))
@@ -145,21 +291,23 @@ if __name__ == '__main__':
 if hasattr(app, 'before_serving'):
 	@app.before_serving
 	def ensure_tables_on_start():
-		try:
-			db.create_all()
-			logger.info('Database tables ensured (before_serving)')
-		except Exception:
-			logger.exception('Failed to create DB tables on startup (before_serving)')
+		with app.app_context():
+			try:
+				db.create_all()
+				logger.info('Database tables ensured (before_serving)')
+			except Exception:
+				logger.exception('Failed to create DB tables on startup (before_serving)')
 else:
 	# Fallback: run once on first request per process
 	def _ensure_tables_once():
 		if not getattr(app, '_tables_ensured', False):
-			try:
-				db.create_all()
-				app._tables_ensured = True
-				logger.info('Database tables ensured (before_request fallback)')
-			except Exception:
-				logger.exception('Failed to create DB tables on startup (before_request fallback)')
+			with app.app_context():
+				try:
+					db.create_all()
+					app._tables_ensured = True
+					logger.info('Database tables ensured (before_request fallback)')
+				except Exception:
+					logger.exception('Failed to create DB tables on startup (before_request fallback)')
 
 	@app.before_request
 	def ensure_tables():

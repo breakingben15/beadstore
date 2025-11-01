@@ -17,6 +17,19 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
+      /* Add spinner for loading state */
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border-left-color: #fff;
+        animation: spin 1s ease infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
     </style>
   </head>
   <body class="bg-gray-100 text-gray-900">
@@ -148,18 +161,19 @@
                 </div>
                 <div class="w-full sm:w-1/3">
                   <label for="checkout-state" class="block text-sm font-medium text-gray-700">State</label>
-                  <input type="text" id="checkout-state" placeholder="NY" maxlength="2" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                  <input type="text" id="checkout-state" placeholder="NY" maxlength="20" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
                 </div>
                 <div class="w-full sm:w-1/3">
                   <label for="checkout-zip" class="block text-sm font-medium text-gray-700">Zip Code</label>
-                  <input type="text" id="checkout-zip" placeholder="10001" inputmode="numeric" pattern="[0-9]{5}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                  <input type="text" id="checkout-zip" placeholder="10001" inputmode="numeric" pattern="[0-9-]{5,10}" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
                 </div>
               </div>
               
               <h3 class="text-2xl font-semibold pt-6 mb-4 text-gray-700">Payment Details</h3>
+              <p class="text-sm text-gray-500 -mt-4">This is a demo. Do not enter real card details.</p>
               <div>
                 <label for="checkout-card" class="block text-sm font-medium text-gray-700">Card Number</label>
-                <input type="text" id="checkout-card" placeholder="•••• •••• •••• ••••" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                <input type="text" id="checkout-card" placeholder="•••• •••• •••• 4242" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
               </div>
               <div class="flex gap-4">
                 <div class="flex-1">
@@ -194,8 +208,9 @@
                   <span id="checkout-total">$0.00</span>
                 </div>
               </div>
-              <button type="submit" form="checkout-form" class="w-full mt-6 bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300">
-                Place Order
+              <button type="submit" form="checkout-form" id="place-order-btn" class="w-full mt-6 bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center justify-center disabled:bg-gray-400">
+                <span id="place-order-text">Place Order</span>
+                <div id="place-order-spinner" class="spinner hidden"></div>
               </button>
             </div>
           </div>
@@ -208,7 +223,7 @@
           <div class="bg-white p-10 rounded-lg shadow-2xl">
             <svg class="w-20 h-20 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <h2 class="text-3xl font-bold mb-4 text-gray-800">Order Confirmed!</h2>
-            <p class="text-gray-600 mb-6">Thank you for your purchase. A confirmation email has been sent to you.</p>
+            <p class="text-gray-600 mb-6">Thank you for your purchase. Your order has been saved.</p>
             <button id="back-to-home-btn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300">
               Continue Shopping
             </button>
@@ -247,20 +262,23 @@
         const cartEmptyMessage = document.getElementById('cart-empty-message');
         const cartSummaryEl = document.getElementById('cart-summary');
         const checkoutButton = document.getElementById('checkout-button');
-  const adminLoginForm = document.getElementById('admin-login-form');
-  const adminLoginError = document.getElementById('admin-login-error');
-  const adminLogoutBtn = document.getElementById('admin-logout-btn');
+        const adminLoginForm = document.getElementById('admin-login-form');
+        const adminLoginError = document.getElementById('admin-login-error');
+        const adminLogoutBtn = document.getElementById('admin-logout-btn');
         const checkoutForm = document.getElementById('checkout-form');
         const checkoutSummaryItems = document.getElementById('checkout-summary-items');
         const checkoutSubtotal = document.getElementById('checkout-subtotal');
         const checkoutTotal = document.getElementById('checkout-total');
         const backToHomeBtn = document.getElementById('back-to-home-btn');
+        
+        // **NEW** Checkout button selectors
+        const placeOrderBtn = document.getElementById('place-order-btn');
+        const placeOrderText = document.getElementById('place-order-text');
+        const placeOrderSpinner = document.getElementById('place-order-spinner');
 
-  // --- STATE ---
-  // The frontend now talks to the backend API for products.
-  // Admin actions send X-ADMIN-PASS header with the password configured on the server.
-  let products = [];
-        let cart = [];
+        // --- STATE ---
+        let products = [];
+        let cart = []; // This will be our source of truth, e.g. [{ id: 1, quantity: 2 }]
         
         // --- UTILITY FUNCTIONS ---
         function showNotification(message, isError = false) {
@@ -288,19 +306,21 @@
         navLinks.forEach(link => {
           link.addEventListener('click', (e) => {
             e.preventDefault();
-            // FIX: Use e.currentTarget instead of e.target
-            // e.target could be the SVG or SPAN inside the <a> tag
             const pageId = e.currentTarget.getAttribute('href').substring(1);
             
             if (pageId === 'admin-page') {
-              showPage('admin-login-page');
+              // Check auth status before showing admin page
+              if (window.__isAdmin) {
+                showPage('admin-page');
+              } else {
+                showPage('admin-login-page');
+              }
             } else {
               showPage(pageId);
             }
 
             // Highlight active link
             navLinks.forEach(l => l.classList.remove('text-indigo-600', 'font-bold'));
-            // FIX: Use e.currentTarget here as well
             e.currentTarget.classList.add('text-indigo-600', 'font-bold');
           });
         });
@@ -315,13 +335,21 @@
             const res = await fetch('/api/me');
             const info = await res.json();
             window.__isAdmin = info.is_admin === true;
-            // show admin page if already on admin-login or admin page
-            if (window.__isAdmin && document.querySelector('nav a[href="#admin-page"]').classList.contains('font-bold')) {
+            
+            // Check if user was trying to access admin
+            const onAdminPage = document.querySelector('nav a[href="#admin-page"]').classList.contains('font-bold');
+
+            if (window.__isAdmin && onAdminPage) {
               showPage('admin-page');
+            } else if (!window.__isAdmin && onAdminPage) {
+              showPage('admin-login-page');
             }
+            // Always re-render products to show/hide admin buttons
             renderProducts();
           } catch (err) {
             console.error(err);
+            window.__isAdmin = false;
+            renderProducts();
           }
         }
 
@@ -343,11 +371,13 @@
           }
         });
 
-        // Optional logout button on admin page
         if (adminLogoutBtn) {
           adminLogoutBtn.addEventListener('click', async () => {
             await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
             window.__isAdmin = false;
+            // Go to home page and remove admin highlight
+            document.querySelector('nav a[href="#admin-page"]').classList.remove('text-indigo-600', 'font-bold');
+            document.querySelector('nav a[href="#home-page"]').classList.add('text-indigo-600', 'font-bold');
             showPage('home-page');
             renderProducts();
           });
@@ -356,10 +386,15 @@
         // --- PRODUCT MANAGEMENT ---
         function renderProducts() {
           productGrid.innerHTML = '';
+          if (!products || products.length === 0) {
+            productGrid.innerHTML = '<p class="text-gray-500 col-span-full">No products found. An admin can add products.</p>';
+            return;
+          }
+
           products.forEach(product => {
             const productCard = document.createElement('div');
             productCard.className = 'bg-white rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105';
-            const deleteBtnHtml = (window.__isAdmin) ? `<button onclick="deleteProduct(${product.id})" class="bg-red-500 text-white font-bold py-3 px-4 rounded">Delete</button>` : '';
+            const deleteBtnHtml = (window.__isAdmin) ? `<button onclick="deleteProduct(${product.id})" class="bg-red-500 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-red-600 transition-colors">Delete</button>` : '';
             productCard.innerHTML = `
               <img src="${product.imageUrl || 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=No+Image'}" alt="${product.name}" class="w-full h-64 object-cover" onerror="this.src='https://placehold.co/600x400/e2e8f0/cbd5e0?text=Image+Not+Found'">
               <div class="p-6">
@@ -401,17 +436,19 @@
               return;
             }
 
-            const created = await res.json();
             adminForm.reset();
             showNotification('Bauble added successfully!');
-            await loadProducts();
+            await loadProducts(); // Refresh product list
           } catch (err) {
             showNotification('Network error', true);
           }
         });
 
-        // Delete product helper (used by admin list UI)
-        async function deleteProduct(id) {
+        // Make deleteProduct global for inline onclick
+        window.deleteProduct = async function(id) {
+          if (!confirm('Are you sure you want to delete this product?')) {
+            return;
+          }
           try {
             const res = await fetch(`/api/products/${id}`, {
               method: 'DELETE',
@@ -422,16 +459,18 @@
               showNotification(err.error || 'Failed to delete', true);
               return;
             }
-            showNotification('Deleted');
-            await loadProducts();
+            showNotification('Product deleted');
+            await loadProducts(); // Refresh product list
           } catch (err) {
             showNotification('Network error', true);
           }
         }
 
         // --- CART MANAGEMENT ---
-        // Made addToCart global by attaching to window so inline onclick can find it
         window.addToCart = function(productId) {
+          const product = products.find(p => p.id === productId);
+          if (!product) return; // Safety check
+
           const existingItem = cart.find(item => item.id === productId);
           if (existingItem) {
             existingItem.quantity++;
@@ -439,7 +478,21 @@
             cart.push({ id: productId, quantity: 1 });
           }
           updateCart();
-          showNotification('Item added to cart!');
+          showNotification(`Added '${product.name}' to cart!`);
+        }
+        
+        // **NEW** Remove from cart function
+        window.removeFromCart = function(productId) {
+          const itemIndex = cart.findIndex(item => item.id === productId);
+          if (itemIndex === -1) return;
+
+          const item = cart[itemIndex];
+          item.quantity--;
+
+          if (item.quantity <= 0) {
+            cart.splice(itemIndex, 1); // Remove item from cart if quantity is 0
+          }
+          updateCart();
         }
 
         function updateCart() {
@@ -454,18 +507,23 @@
             let total = 0;
             cart.forEach(item => {
               const product = products.find(p => p.id === item.id);
-              if (!product) return; // Safety check
+              if (!product) {
+                // This can happen if a product was deleted after being added to cart
+                // We'll filter this item out on next update
+                return;
+              }
 
               total += product.price * item.quantity;
               
               const itemEl = document.createElement('div');
-              itemEl.className = 'flex justify-between items-center bg-gray-50 p-4 rounded-lg shadow-sm';
+              itemEl.className = 'flex justify-between items-center bg-white p-4 rounded-lg shadow-sm';
               itemEl.innerHTML = `
                 <div class="flex items-center gap-4">
-                  <img src="${product.imageUrl}" alt="${product.name}" class="w-16 h-16 rounded-md object-cover">
+                  <img src="${product.imageUrl || 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=No+Image'}" alt="${product.name}" class="w-16 h-16 rounded-md object-cover">
                   <div>
                     <h4 class="font-bold text-lg">${product.name}</h4>
                     <p class="text-gray-600">$${product.price.toFixed(2)} x ${item.quantity}</p>
+                    <button onclick="removeFromCart(${product.id})" class="text-sm text-red-500 hover:text-red-700">Remove</button>
                   </div>
                 </div>
                 <span class="font-bold text-lg">$${(product.price * item.quantity).toFixed(2)}</span>
@@ -497,6 +555,7 @@
           
           cart.forEach(item => {
             const product = products.find(p => p.id === item.id);
+            if (!product) return;
             subtotal += product.price * item.quantity;
             
             const itemEl = document.createElement('div');
@@ -511,28 +570,79 @@
             checkoutSummaryItems.appendChild(itemEl);
           });
           
-          const shipping = 5.00;
+          const shipping = 5.00; // Hardcoded shipping
           const total = subtotal + shipping;
           
           checkoutSubtotal.textContent = `$${subtotal.toFixed(2)}`;
           checkoutTotal.textContent = `$${total.toFixed(2)}`;
         }
 
-        checkoutForm.addEventListener('submit', (e) => {
+        // *** THIS IS THE UPDATED FUNCTION ***
+        checkoutForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           
-          // Clear the cart
-          cart = [];
-          updateCart();
-          
-          // Show confirmation
-          showPage('order-confirmation-page');
-          
-          // Reset checkout form
-          checkoutForm.reset();
+          // Show loading state
+          placeOrderBtn.disabled = true;
+          placeOrderText.classList.add('hidden');
+          placeOrderSpinner.classList.remove('hidden');
+
+          // 1. Gather Customer Info
+          const customerInfo = {
+            name: document.getElementById('checkout-name').value,
+            email: document.getElementById('checkout-email').value,
+            street1: document.getElementById('checkout-street1').value,
+            street2: document.getElementById('checkout-street2').value,
+            city: document.getElementById('checkout-city').value,
+            state: document.getElementById('checkout-state').value,
+            zip: document.getElementById('checkout-zip').value,
+            // We don't send payment info to our server
+          };
+
+          // 2. Create payload
+          const payload = {
+            customerInfo: customerInfo,
+            cartItems: cart // Send the cart array
+          };
+
+          try {
+            // 3. Send to server
+            const res = await fetch('/api/orders', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Credentials': 'same-origin'
+              },
+              body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+              const err = await res.json();
+              // Show a specific error if available
+              throw new Error(err.error || 'Failed to place order.');
+            }
+
+            // 4. Success! Clear cart and show confirmation
+            cart = [];
+            updateCart();
+            showPage('order-confirmation-page');
+            checkoutForm.reset();
+
+          } catch (err) {
+            // 5. Handle errors
+            console.error('Order submission failed:', err);
+            showNotification(err.message || 'Order failed. Please try again.', true);
+          } finally {
+            // 6. Reset button
+            placeOrderBtn.disabled = false;
+            placeOrderText.classList.remove('hidden');
+            placeOrderSpinner.classList.add('hidden');
+          }
         });
 
         backToHomeBtn.addEventListener('click', () => {
+          // Also remove admin highlight if active
+          document.querySelector('nav a[href="#admin-page"]').classList.remove('text-indigo-600', 'font-bold');
+          document.querySelector('nav a[href="#home-page"]').classList.add('text-indigo-600', 'font-bold');
           showPage('home-page');
         });
 
@@ -540,20 +650,20 @@
         async function loadProducts() {
           try {
             const res = await fetch('/api/products');
+            if (!res.ok) throw new Error('Failed to fetch');
             products = await res.json();
             renderProducts();
           } catch (err) {
             console.error('Failed to load products', err);
+            productGrid.innerHTML = '<p class="text-red-500 col-span-full">Error loading products. Please refresh the page.</p>';
           }
         }
 
         // --- INITIAL RENDER ---
         await refreshAuth();
         await loadProducts();
-        updateCart();
+        updateCart(); // Initialize cart view
       });
     </script>
   </body>
 </html>
-
-
