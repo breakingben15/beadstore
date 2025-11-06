@@ -4,3 +4,4 @@ gunicorn
 Flask-SQLAlchemy
 SQLAlchemy
 requests
+psycopg2-binary

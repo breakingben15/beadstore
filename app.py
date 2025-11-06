@@ -14,7 +14,19 @@ if env_path.exists():
 BASE_DIR = Path(__file__).parent
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:///{BASE_DIR / "data.db"}')
+db_url = os.environ.get('DATABASE_URL')
+
+if db_url and db_url.startswith('postgres://'):
+    # Render's DATABASE_URL starts with 'postgres://'
+    # but SQLAlchemy needs 'postgresql://'
+    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    print("Found and adapted DATABASE_URL for PostgreSQL.")
+else:
+    # If no DATABASE_URL is set, fall back to local SQLite for development
+    db_url = f'sqlite:///{BASE_DIR / "data.db"}'
+    print("DATABASE_URL not found. Using local sqlite:// data.db")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
