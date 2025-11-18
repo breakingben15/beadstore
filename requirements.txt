@@ -5,3 +5,4 @@ Flask-SQLAlchemy
 SQLAlchemy
 requests
 psycopg2-binary
+stripe
