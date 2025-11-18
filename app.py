@@ -14,8 +14,7 @@ if env_path.exists():
 BASE_DIR = Path(__file__).parent
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-db_url = os.environ.get('postgresql://bead_store_user:NCbSBnRcizfO1hSZRzFXebjPsATddw81@dpg-d46j24uuk2gs738785b0-a.ohio-postgres.render.com/bead_store')
-
+db_url = os.environ.get('DATABASE_URL')
 if db_url and db_url.startswith('postgres://'):
     # Render's DATABASE_URL starts with 'postgres://'
     # but SQLAlchemy needs 'postgresql://'
