@@ -137,6 +137,11 @@ def api_me():
 	return jsonify({'is_admin': is_admin_logged_in()})
 
 # --- Main Page ---
+# --- Health Check (For UptimeRobot) ---
+@app.route('/health')
+def health_check():
+    # Returning a simple string and 200 status code
+    return "Alive", 200
 
 @app.route('/')
 def index():
