@@ -19,11 +19,11 @@ if db_url and db_url.startswith('postgres://'):
     # Render's DATABASE_URL starts with 'postgres://'
     # but SQLAlchemy needs 'postgresql://'
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
-    print("Found and adapted DATABASE_URL for PostgreSQL.")
+    print("Found and adapted RENDER_DB_URL for PostgreSQL.")
 else:
     # If no DATABASE_URL is set, fall back to local SQLite for development
     db_url = f'sqlite:///{BASE_DIR / "data.db"}'
-    print("DATABASE_URL not found. Using local sqlite:// data.db")
+    print("RENDER_DB_URL not found. Using local sqlite:// data.db")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
