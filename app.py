@@ -14,18 +14,25 @@ if env_path.exists():
 BASE_DIR = Path(__file__).parent
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+# --- Database Configuration ---
+# Check for the RENDER_DB_URL environment variable first
 db_url = os.environ.get('RENDER_DB_URL')
-if db_url and db_url.startswith('postgres://'):
-    # Render's DATABASE_URL starts with 'postgres://'
-    # but SQLAlchemy needs 'postgresql://'
-    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+
+if db_url:
+    # This replacement is necessary because Render's URL uses 'postgres://' 
+    # but SQLAlchemy 2.0+ requires 'postgresql://' for the driver.
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     print("Found and adapted RENDER_DB_URL for PostgreSQL.")
 else:
-    # If no DATABASE_URL is set, fall back to local SQLite for development
-    db_url = f'sqlite:///{BASE_DIR / "data.db"}'
+    # Fallback to local SQLite for development
+    sqlite_url = f'sqlite:///{BASE_DIR / "data.db"}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = sqlite_url
     print("RENDER_DB_URL not found. Using local sqlite:// data.db")
 
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
