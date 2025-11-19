@@ -248,11 +248,17 @@ def create_product():
 
 @app.route('/api/products/<int:product_id>', methods=['DELETE'])
 def delete_product(product_id):
-    # ... (Logic) ...
 	if not is_admin_logged_in():
 		return jsonify({'error': 'unauthorized'}), 401
 
 	product = Product.query.get_or_404(product_id)
+	
+	# FIX: Unlink this product from any existing orders before deleting
+	# This prevents the "Foreign Key Constraint" error
+	existing_orders = OrderItem.query.filter_by(product_id=product.id).all()
+	for item in existing_orders:
+		item.product_id = None # Keep the record, but remove the link
+	
 	db.session.delete(product)
 	try:
 		db.session.commit()
@@ -261,6 +267,7 @@ def delete_product(product_id):
 		db.session.rollback()
 		return jsonify({'error': 'internal error', 'detail': str(e)}), 500
 	return jsonify({'status': 'deleted'})
+
 
 
 # --- Order API (List Only) ---
