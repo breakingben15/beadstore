@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Beaded Baubles</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://js.stripe.com/v3/"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
       body {
@@ -746,30 +747,37 @@
             cartItems: cart
           };
 
-          try {
-            // *** FIXED: Reverted to relative URL ***
-            const res = await fetch('/api/orders', {
+         try {
+    // Note: You must initialize Stripe with your pk_test_... key
+    // REPLACE 'YOUR_PUBLISHABLE_KEY_HERE' with your actual pk_test_... key
+          const stripe = Stripe('YOUR_PUBLISHABLE_KEY_HERE'); 
+      
+          // 1. Call the new backend route to create the session ID
+          const sessionRes = await fetch('/create-checkout-session', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'same-origin',
-              body: JSON.stringify(payload)
-            });
-
-            if (!res.ok) {
-              const err = await res.json();
-              throw new Error(err.error || 'Failed to place order.');
-            }
-
-            cart = [];
-            updateCart();
-            showPage('order-confirmation-page');
-            checkoutForm.reset();
-
-          } catch (err) {
-            console.error('Checkout error:', err);
-            showNotification(err.message || 'Error placing order.', true);
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload) 
+          });
+      
+          const sessionData = await sessionRes.json();
+      
+          if (sessionRes.ok && sessionData.id) {
+              // 2. Redirect the user to Stripe's hosted Checkout Page
+              const result = await stripe.redirectToCheckout({
+                  sessionId: sessionData.id,
+              });
+      
+              if (result.error) {
+                  throw new Error(result.error.message);
+              }
+          } else {
+              throw new Error(sessionData.error || 'Failed to create checkout session.');
+          }
+      
+      } catch (err) {
+          console.error('Checkout error:', err);
+          showNotification(err.message || 'Error placing order.', true);
+      }
           } finally {
             // Re-enable button
             placeOrderBtn.disabled = false;
