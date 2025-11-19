@@ -1,13 +1,17 @@
 from pathlib import Path
 from dotenv import load_dotenv
-from flask import Flask, render_template, jsonify, request, abort, session
+from flask import Flask, render_template, jsonify, request, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import stripe
 import os
 import logging
 
+# --- Initialization ---
+
+# Set Stripe API key from environment variable
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+
 # Load environment variables from .env if present
 env_path = Path(__file__).parent / '.env'
 if env_path.exists():
@@ -47,75 +51,78 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Models ---
+# (Models section is unchanged)
 
 class Product(db.Model):
-	id = db.Column(db.Integer, primary_key=True)
-	name = db.Column(db.String(256), nullable=False)
-	price = db.Column(db.Float, nullable=False)
-	image_url = db.Column(db.String(1024), nullable=True)
-	created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # ... (Model Definition) ...
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(256), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    image_url = db.Column(db.String(1024), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-	def to_dict(self):
-		return {
-			'id': self.id,
-			'name': self.name,
-			'price': self.price,
-			'imageUrl': self.image_url,
-			'createdAt': self.created_at.isoformat()
-		}
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'price': self.price,
+            'imageUrl': self.image_url,
+            'createdAt': self.created_at.isoformat()
+        }
 
 class Order(db.Model):
-	id = db.Column(db.Integer, primary_key=True)
-	created_at = db.Column(db.DateTime, default=datetime.utcnow)
-	# Customer Info
-	customer_name = db.Column(db.String(256), nullable=False)
-	customer_email = db.Column(db.String(256), nullable=False)
-	customer_street1 = db.Column(db.String(256), nullable=False)
-	customer_street2 = db.Column(db.String(256), nullable=True)
-	customer_city = db.Column(db.String(100), nullable=False)
-	customer_state = db.Column(db.String(100), nullable=False)
-	customer_zip = db.Column(db.String(20), nullable=False)
-	# Order Info
-	subtotal = db.Column(db.Float, nullable=False)
-	shipping_cost = db.Column(db.Float, nullable=False)
-	total_price = db.Column(db.Float, nullable=False)
-	items = db.relationship('OrderItem', backref='order', lazy=True, cascade="all, delete-orphan")
+    # ... (Model Definition) ...
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    customer_name = db.Column(db.String(256), nullable=False)
+    customer_email = db.Column(db.String(256), nullable=False)
+    customer_street1 = db.Column(db.String(256), nullable=False)
+    customer_street2 = db.Column(db.String(256), nullable=True)
+    customer_city = db.Column(db.String(100), nullable=False)
+    customer_state = db.Column(db.String(100), nullable=False)
+    customer_zip = db.Column(db.String(20), nullable=False)
+    subtotal = db.Column(db.Float, nullable=False)
+    shipping_cost = db.Column(db.Float, nullable=False)
+    total_price = db.Column(db.Float, nullable=False)
+    items = db.relationship('OrderItem', backref='order', lazy=True, cascade="all, delete-orphan")
 
-	def to_dict(self):
-		return {
-			'id': self.id,
-			'createdAt': self.created_at.isoformat(),
-			'customerName': self.customer_name,
-			'customerEmail': self.customer_email,
-			'totalPrice': self.total_price,
-			'subtotal': self.subtotal,
-			'shippingCost': self.shipping_cost,
-			'items': [item.to_dict() for item in self.items]
-		}
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'createdAt': self.created_at.isoformat(),
+            'customerName': self.customer_name,
+            'customerEmail': self.customer_email,
+            'totalPrice': self.total_price,
+            'subtotal': self.subtotal,
+            'shippingCost': self.shipping_cost,
+            'items': [item.to_dict() for item in self.items]
+        }
 
 class OrderItem(db.Model):
-	id = db.Column(db.Integer, primary_key=True)
-	order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
-	product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True) # Allow null if product is deleted
-	product_name = db.Column(db.String(256), nullable=False) # Store name at time of purchase
-	quantity = db.Column(db.Integer, nullable=False)
-	price_at_purchase = db.Column(db.Float, nullable=False) # Store price at time of purchase
+    # ... (Model Definition) ...
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True)
+    product_name = db.Column(db.String(256), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    price_at_purchase = db.Column(db.Float, nullable=False)
 
-	def to_dict(self):
-		return {
-			'id': self.id,
-			'productId': self.product_id,
-			'productName': self.product_name,
-			'quantity': self.quantity,
-			'priceAtPurchase': self.price_at_purchase
-		}
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'productId': self.product_id,
+            'productName': self.product_name,
+            'quantity': self.quantity,
+            'priceAtPurchase': self.price_at_purchase
+        }
 
 # --- Helper Functions ---
 
 def is_admin_logged_in():
 	return session.get('is_admin') is True
 
-# --- Auth Routes ---
+# --- Stripe Checkout Routes ---
+
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     data = request.get_json()
@@ -124,13 +131,13 @@ def create_checkout_session():
     # 1. Transform cart items into Stripe's line_items format
     line_items = []
     for item in cart_items:
+        # CRITICAL: Use your Product model to validate price and name
         product = Product.query.get(item['id'])
         if product:
             line_items.append({
                 'price_data': {
                     'currency': 'usd',
-                    # Stripe requires price in cents
-                    'unit_amount': int(product.price * 100), 
+                    'unit_amount': int(product.price * 100), # Convert to cents
                     'product_data': {
                         'name': product.name,
                     },
@@ -144,7 +151,7 @@ def create_checkout_session():
             payment_method_types=['card'],
             line_items=line_items,
             mode='payment',
-            # Redirect the user back to these pages after payment
+            # Redirect the user back to these simple pages after payment
             success_url=request.url_root + 'payment/success',
             cancel_url=request.url_root + 'payment/cancel',
         )
@@ -154,19 +161,24 @@ def create_checkout_session():
     except Exception as e:
         logger.error(f"Error creating Stripe session: {e}")
         return jsonify(error="Failed to create checkout session."), 403
+
 # --- Post-Payment Redirect Routes ---
+# You need to create 'success.html' and 'cancel.html' in your templates folder.
 
 @app.route('/payment/success')
 def payment_success():
-    # You would typically confirm payment via a webhook before showing this.
-    return render_template('success.html') # Need to create this file
+    # NOTE: In a real app, the order would be saved to DB here or via a webhook.
+    return render_template('success.html') 
 
 @app.route('/payment/cancel')
 def payment_cancel():
-    return render_template('cancel.html') # Need to create this file
-	
+    return render_template('cancel.html') 
+
+# --- Admin/Auth Routes ---
+
 @app.route('/api/login', methods=['POST'])
 def api_login():
+# ... (Unchanged Auth Logic) ...
 	data = request.get_json() or {}
 	password = data.get('password')
 	env_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
@@ -175,22 +187,19 @@ def api_login():
 		return jsonify({'status': 'ok'})
 	return jsonify({'error': 'invalid credentials'}), 401
 
-
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
 	session.pop('is_admin', None)
 	return jsonify({'status': 'ok'})
 
-
 @app.route('/api/me')
 def api_me():
 	return jsonify({'is_admin': is_admin_logged_in()})
 
-# --- Main Page ---
-# --- Health Check (For UptimeRobot) ---
+# --- Main Page & Health Check ---
+
 @app.route('/health')
 def health_check():
-    # Returning a simple string and 200 status code
     return "Alive", 200
 
 @app.route('/')
@@ -198,15 +207,18 @@ def index():
 	return render_template('index.html')
 
 # --- Product API ---
+# ... (list_products, create_product, delete_product are unchanged) ...
 
 @app.route('/api/products', methods=['GET'])
 def list_products():
+    # ... (Logic) ...
 	products = Product.query.order_by(Product.created_at.desc()).all()
 	return jsonify([p.to_dict() for p in products])
 
 
 @app.route('/api/products', methods=['POST'])
 def create_product():
+    # ... (Logic) ...
 	if not is_admin_logged_in():
 		return jsonify({'error': 'unauthorized'}), 401
 
@@ -236,6 +248,7 @@ def create_product():
 
 @app.route('/api/products/<int:product_id>', methods=['DELETE'])
 def delete_product(product_id):
+    # ... (Logic) ...
 	if not is_admin_logged_in():
 		return jsonify({'error': 'unauthorized'}), 401
 
@@ -249,87 +262,12 @@ def delete_product(product_id):
 		return jsonify({'error': 'internal error', 'detail': str(e)}), 500
 	return jsonify({'status': 'deleted'})
 
-# --- Order API ---
 
-# New route to create a Stripe Checkout Session
-@app.route('/create-checkout-session', methods=['POST'])
-def create_checkout_session():
-    # Reuse your cart verification logic here (items, subtotal calculation, etc.)
-    data = request.get_json()
-    cart_items = data.get('cartItems')
-    
-    # Transform your cart items into Stripe's required format (line_items)
-    line_items = []
-    for item in cart_items:
-        # Note: Stripe requires the price in cents (e.g., $19.99 is 1999)
-        product = Product.query.get(item['id'])
-        if product:
-            line_items.append({
-                'price_data': {
-                    'currency': 'usd',
-                    'unit_amount': int(product.price * 100),  # Convert to cents
-                    'product_data': {
-                        'name': product.name,
-                    },
-                },
-                'quantity': item['quantity'],
-            })
-            
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=line_items,
-            mode='payment',
-            success_url=request.url_root + 'success?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url=request.url_root + 'cancel',
-        )
-        return jsonify({'id': session.id})
-    except Exception as e:
-        return jsonify(error=str(e)), 403
-		
-		# Hardcoded shipping for this example
-		shipping_cost = 5.00
-		total_price = subtotal + shipping_cost
-
-		# Create the order
-		new_order = Order(
-			customer_name=customer_info['name'],
-			customer_email=customer_info['email'],
-			customer_street1=customer_info['street1'],
-			customer_street2=customer_info.get('street2'),
-			customer_city=customer_info['city'],
-			customer_state=customer_info['state'],
-			customer_zip=customer_info['zip'],
-			subtotal=subtotal,
-			shipping_cost=shipping_cost,
-			total_price=total_price
-		)
-		
-		# Add order and items to session
-		db.session.add(new_order)
-		# This associates items with the order *after* new_order gets its ID
-		for item in new_order_items:
-			item.order = new_order
-			db.session.add(item)
-		
-		db.session.commit()
-		
-		logger.info(f'Created new order {new_order.id} for {new_order.customer_email} with {len(new_order_items)} items.')
-
-		return jsonify(new_order.to_dict()), 201
-
-	except ValueError as e:
-		logger.warning(f'Validation error creating order: {e}')
-		db.session.rollback()
-		return jsonify({'error': str(e)}), 400
-	except Exception as e:
-		logger.exception('Failed to create order')
-		db.session.rollback()
-		return jsonify({'error': 'internal server error', 'detail': str(e)}), 500
-
-# You could also add an admin-only route to view orders
+# --- Order API (List Only) ---
+# The POST route was replaced by Stripe. This keeps the GET route for Admin.
 @app.route('/api/orders', methods=['GET'])
 def list_orders():
+    # ... (Logic) ...
 	if not is_admin_logged_in():
 		return jsonify({'error': 'unauthorized'}), 401
 	
@@ -340,6 +278,7 @@ def list_orders():
 # --- App Start / DB Init ---
 
 if __name__ == '__main__':
+    # ... (Run command) ...
 	# Ensure DB exists when running locally
 	with app.app_context():
 		try:
@@ -352,10 +291,7 @@ if __name__ == '__main__':
 	app.run(host='127.0.0.1', port=port, debug=debug)
 
 
-# When running under a WSGI server (gunicorn / Render) the __main__ block
-# won't execute. Prefer `before_serving` (newer Flask) which runs once when
-# the server is ready; fall back to a guarded `before_request` that creates
-# tables only the first time to avoid calling create_all() on every request.
+# ... (WSGI/Render specific setup unchanged) ...
 if hasattr(app, 'before_serving'):
 	@app.before_serving
 	def ensure_tables_on_start():
