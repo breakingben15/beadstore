@@ -116,6 +116,44 @@ def is_admin_logged_in():
 	return session.get('is_admin') is True
 
 # --- Auth Routes ---
+@app.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    data = request.get_json()
+    cart_items = data.get('cartItems')
+    
+    # 1. Transform cart items into Stripe's line_items format
+    line_items = []
+    for item in cart_items:
+        product = Product.query.get(item['id'])
+        if product:
+            line_items.append({
+                'price_data': {
+                    'currency': 'usd',
+                    # Stripe requires price in cents
+                    'unit_amount': int(product.price * 100), 
+                    'product_data': {
+                        'name': product.name,
+                    },
+                },
+                'quantity': item['quantity'],
+            })
+            
+    try:
+        # 2. Create the secure Stripe session
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=line_items,
+            mode='payment',
+            # Redirect the user back to these pages after payment
+            success_url=request.url_root + 'payment/success',
+            cancel_url=request.url_root + 'payment/cancel',
+        )
+        # 3. Send the session ID back to the frontend
+        return jsonify({'id': session.id})
+    
+    except Exception as e:
+        logger.error(f"Error creating Stripe session: {e}")
+        return jsonify(error="Failed to create checkout session."), 403
 # --- Post-Payment Redirect Routes ---
 
 @app.route('/payment/success')
