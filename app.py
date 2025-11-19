@@ -3,9 +3,11 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, jsonify, request, abort, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import stripe
 import os
 import logging
 
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 # Load environment variables from .env if present
 env_path = Path(__file__).parent / '.env'
 if env_path.exists():
@@ -201,46 +203,41 @@ def delete_product(product_id):
 
 # --- Order API ---
 
-@app.route('/api/orders', methods=['POST'])
-def create_order():
-	data = request.get_json() or {}
-	customer_info = data.get('customerInfo')
-	cart_items = data.get('cartItems')
-
-	if not customer_info or not cart_items:
-		return jsonify({'error': 'Missing customer info or cart items'}), 400
-	
-	required_fields = ['name', 'email', 'street1', 'city', 'state', 'zip']
-	if not all(customer_info.get(f) for f in required_fields):
-		return jsonify({'error': 'Missing required customer fields'}), 400
-
-	new_order_items = []
-	subtotal = 0.0
-
-	try:
-		# Verify products and prices from DB
-		for item in cart_items:
-			product_id = item.get('id')
-			quantity = item.get('quantity')
-			if not product_id or not quantity or quantity <= 0:
-				raise ValueError(f'Invalid cart item: {item}')
-			
-			product = Product.query.get(product_id)
-			if not product:
-				raise ValueError(f'Product with id {product_id} not found')
-
-			price_at_purchase = product.price
-			subtotal += price_at_purchase * quantity
-			
-			new_order_items.append(OrderItem(
-				product_id=product.id,
-				product_name=product.name,
-				quantity=quantity,
-				price_at_purchase=price_at_purchase
-			))
-
-		if not new_order_items:
-			return jsonify({'error': 'Cart cannot be empty'}), 400
+# New route to create a Stripe Checkout Session
+@app.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    # Reuse your cart verification logic here (items, subtotal calculation, etc.)
+    data = request.get_json()
+    cart_items = data.get('cartItems')
+    
+    # Transform your cart items into Stripe's required format (line_items)
+    line_items = []
+    for item in cart_items:
+        # Note: Stripe requires the price in cents (e.g., $19.99 is 1999)
+        product = Product.query.get(item['id'])
+        if product:
+            line_items.append({
+                'price_data': {
+                    'currency': 'usd',
+                    'unit_amount': int(product.price * 100),  # Convert to cents
+                    'product_data': {
+                        'name': product.name,
+                    },
+                },
+                'quantity': item['quantity'],
+            })
+            
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=line_items,
+            mode='payment',
+            success_url=request.url_root + 'success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=request.url_root + 'cancel',
+        )
+        return jsonify({'id': session.id})
+    except Exception as e:
+        return jsonify(error=str(e)), 403
 		
 		# Hardcoded shipping for this example
 		shipping_cost = 5.00
