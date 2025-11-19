@@ -116,7 +116,17 @@ def is_admin_logged_in():
 	return session.get('is_admin') is True
 
 # --- Auth Routes ---
+# --- Post-Payment Redirect Routes ---
 
+@app.route('/payment/success')
+def payment_success():
+    # You would typically confirm payment via a webhook before showing this.
+    return render_template('success.html') # Need to create this file
+
+@app.route('/payment/cancel')
+def payment_cancel():
+    return render_template('cancel.html') # Need to create this file
+	
 @app.route('/api/login', methods=['POST'])
 def api_login():
 	data = request.get_json() or {}
