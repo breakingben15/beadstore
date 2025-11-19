@@ -307,45 +307,58 @@
         }
         
                // --- PAGE NAVIGATION ---
-        function showPage(pageId) {
-            pages.forEach(page => {
-                if (page.id === pageId) {
-                    page.classList.remove('hidden');
-                } else {
-                    page.classList.add('hidden');
-                }
-            });
-            window.scrollTo(0, 0);
-        }
-        
-        navLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault(); // KEEP this to manage navigation with JS
-                
-                const targetHref = e.currentTarget.getAttribute('href');
-                const pageId = targetHref.substring(1);
-                let finalPageId = pageId; // Start with the link's target (e.g., 'admin-page')
-        
-                // 1. Determine the actual page ID to show
-                if (pageId === 'admin-page') {
-                    // If the user is NOT logged in, force them to the login page ID.
+        // --- PAGE NAVIGATION ---
+            function showPage(pageId) {
+                pages.forEach(page => {
+                    if (page.id === pageId) {
+                        page.classList.remove('hidden');
+                    } else {
+                        page.classList.add('hidden');
+                    }
+                });
+                window.scrollTo(0, 0);
+            }
+            
+            // 1. New function to handle all navigation logic based on the URL hash
+            function navigateToHash(hash) {
+                const hashId = hash.substring(1);
+                const pageId = hashId || 'home-page';
+                let finalPageId = pageId;
+            
+                // A. Admin Authentication Check
+                if (finalPageId === 'admin-page') {
                     if (!window.__isAdmin) {
                         finalPageId = 'admin-login-page';
                     }
+                    // If we are showing the admin page, load the orders
+                    if (finalPageId === 'admin-page') {
+                        loadAndRenderOrders();
+                    }
                 }
                 
-                // 2. Show the determined page (admin-page OR admin-login-page)
+                // B. Show the page content
                 showPage(finalPageId);
                 
-                // 3. Manually update the URL hash to match the page shown (e.g., #admin-login-page)
-                // This is the critical step missing from your original code
-                window.location.hash = finalPageId; 
-        
-                // 4. Update the active link highlighting
+                // C. Update the active link highlighting
                 navLinks.forEach(l => l.classList.remove('text-indigo-600', 'font-bold'));
-                e.currentTarget.classList.add('text-indigo-600', 'font-bold');
-            });
-        });
+                const activeLink = document.querySelector(`nav a[href="#${pageId}"]`) || document.querySelector('nav a[href="#home-page"]');
+                if (activeLink) {
+                    activeLink.classList.add('text-indigo-600', 'font-bold');
+                }
+            }
+            
+            // 2. Add event listeners for both page load and hash changes
+            window.addEventListener('hashchange', () => navigateToHash(window.location.hash));
+            
+            // 3. Initial page load check
+            // This runs once when the app starts, checking the current URL hash
+            if (window.location.hash) {
+                // Navigates to a specific page if the user loaded the URL with a hash
+                navigateToHash(window.location.hash);
+            } else {
+                // Defaults to home page if no hash is present in the URL
+                window.location.hash = 'home-page';
+            }
 
         // Set home as default active link
         document.querySelector('nav a[href="#home-page"]').classList.add('text-indigo-600', 'font-bold');
