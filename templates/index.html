@@ -360,10 +360,6 @@
                 window.location.hash = 'home-page';
             }
 
-        // Set home as default active link
-        document.querySelector('nav a[href="#home-page"]').classList.add('text-indigo-600', 'font-bold');
-        showPage('home-page');
-
         // --- ADMIN LOGIN (server-backed) ---
         async function refreshAuth() {
           try {
