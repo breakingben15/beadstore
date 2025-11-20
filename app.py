@@ -15,7 +15,7 @@ stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 # Load environment variables from .env if present
 env_path = Path(__file__).parent / '.env'
 if env_path.exists():
-	load_dotenv(env_path)
+    load_dotenv(env_path)
 
 BASE_DIR = Path(__file__).parent
 
@@ -119,7 +119,7 @@ class OrderItem(db.Model):
 # --- Helper Functions ---
 
 def is_admin_logged_in():
-	return session.get('is_admin') is True
+    return session.get('is_admin') is True
 
 # --- Stripe Checkout Routes ---
 
@@ -179,22 +179,22 @@ def payment_cancel():
 @app.route('/api/login', methods=['POST'])
 def api_login():
 # ... (Unchanged Auth Logic) ...
-	data = request.get_json() or {}
-	password = data.get('password')
-	env_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
-	if password and password == env_pass:
-		session['is_admin'] = True
-		return jsonify({'status': 'ok'})
-	return jsonify({'error': 'invalid credentials'}), 401
+    data = request.get_json() or {}
+    password = data.get('password')
+    env_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    if password and password == env_pass:
+        session['is_admin'] = True
+        return jsonify({'status': 'ok'})
+    return jsonify({'error': 'invalid credentials'}), 401
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
-	session.pop('is_admin', None)
-	return jsonify({'status': 'ok'})
+    session.pop('is_admin', None)
+    return jsonify({'status': 'ok'})
 
 @app.route('/api/me')
 def api_me():
-	return jsonify({'is_admin': is_admin_logged_in()})
+    return jsonify({'is_admin': is_admin_logged_in()})
 
 # --- Main Page & Health Check ---
 
@@ -204,7 +204,7 @@ def health_check():
 
 @app.route('/')
 def index():
-	return render_template('index.html')
+    return render_template('index.html')
 
 # --- Product API ---
 # ... (list_products, create_product, delete_product are unchanged) ...
@@ -212,8 +212,8 @@ def index():
 @app.route('/api/products', methods=['GET'])
 def list_products():
     # ... (Logic) ...
-	products = Product.query.order_by(Product.created_at.desc()).all()
-	return jsonify([p.to_dict() for p in products])
+    products = Product.query.order_by(Product.created_at.desc()).all()
+    return jsonify([p.to_dict() for p in products])
 
 
 @app.route('/api/products', methods=['POST'])
@@ -223,66 +223,66 @@ def create_product():
     MAX_URL_LENGTH = 1000
     MAX_PRICE = 9999.99
 
-	if not is_admin_logged_in():
-		return jsonify({'error': 'unauthorized'}), 401
+    if not is_admin_logged_in():
+        return jsonify({'error': 'unauthorized'}), 401
 
-	data = request.get_json() or {}
-	name = data.get('name')
-	price = data.get('price')
-	image_url = data.get('imageUrl') or data.get('image_url')
+    data = request.get_json() or {}
+    name = data.get('name')
+    price = data.get('price')
+    image_url = data.get('imageUrl') or data.get('image_url')
 
     # 1. Basic Presence Check
-	if not name or price is None:
-		return jsonify({'error': 'Name and price required'}), 400
+    if not name or price is None:
+        return jsonify({'error': 'Name and price required'}), 400
 
     # 2. Type/Format Check for Price
-	try:
-		price_val = float(price)
-	except ValueError:
-		return jsonify({'error': 'Invalid price format'}), 400
+    try:
+        price_val = float(price)
+    except ValueError:
+        return jsonify({'error': 'Invalid price format'}), 400
 
     # 3. Value/Range Check
-	if price_val <= 0 or price_val > MAX_PRICE:
-		return jsonify({'error': f'Price must be between $0.01 and ${MAX_PRICE}'}), 400
+    if price_val <= 0 or price_val > MAX_PRICE:
+        return jsonify({'error': f'Price must be between $0.01 and ${MAX_PRICE}'}), 400
     
     # 4. Length Check for Name and URL
-	if len(name) > MAX_NAME_LENGTH:
-		return jsonify({'error': f'Product name is too long (max {MAX_NAME_LENGTH} chars)'}), 400
-	if image_url and len(image_url) > MAX_URL_LENGTH:
-		return jsonify({'error': f'Image URL is too long (max {MAX_URL_LENGTH} chars)'}), 400
+    if len(name) > MAX_NAME_LENGTH:
+        return jsonify({'error': f'Product name is too long (max {MAX_NAME_LENGTH} chars)'}), 400
+    if image_url and len(image_url) > MAX_URL_LENGTH:
+        return jsonify({'error': f'Image URL is too long (max {MAX_URL_LENGTH} chars)'}), 400
 
-	product = Product(name=name, price=price_val, image_url=image_url)
-	db.session.add(product)
-	try:
-		db.session.commit()
-	except Exception as e:
-		logger.exception('Failed to create product')
-		db.session.rollback()
-		return jsonify({'error': 'internal error', 'detail': str(e)}), 500
-	return jsonify(product.to_dict()), 201
+    product = Product(name=name, price=price_val, image_url=image_url)
+    db.session.add(product)
+    try:
+        db.session.commit()
+    except Exception as e:
+        logger.exception('Failed to create product')
+        db.session.rollback()
+        return jsonify({'error': 'internal error', 'detail': str(e)}), 500
+    return jsonify(product.to_dict()), 201
 
 
 @app.route('/api/products/<int:product_id>', methods=['DELETE'])
 def delete_product(product_id):
-	if not is_admin_logged_in():
-		return jsonify({'error': 'unauthorized'}), 401
+    if not is_admin_logged_in():
+        return jsonify({'error': 'unauthorized'}), 401
 
-	product = Product.query.get_or_404(product_id)
-	
-	# FIX: Unlink this product from any existing orders before deleting
-	# This prevents the "Foreign Key Constraint" error
-	existing_orders = OrderItem.query.filter_by(product_id=product.id).all()
-	for item in existing_orders:
-		item.product_id = None # Keep the record, but remove the link
-	
-	db.session.delete(product)
-	try:
-		db.session.commit()
-	except Exception as e:
-		logger.exception('Failed to delete product %s', product_id)
-		db.session.rollback()
-		return jsonify({'error': 'internal error', 'detail': str(e)}), 500
-	return jsonify({'status': 'deleted'})
+    product = Product.query.get_or_404(product_id)
+    
+    # FIX: Unlink this product from any existing orders before deleting
+    # This prevents the "Foreign Key Constraint" error
+    existing_orders = OrderItem.query.filter_by(product_id=product.id).all()
+    for item in existing_orders:
+        item.product_id = None # Keep the record, but remove the link
+    
+    db.session.delete(product)
+    try:
+        db.session.commit()
+    except Exception as e:
+        logger.exception('Failed to delete product %s', product_id)
+        db.session.rollback()
+        return jsonify({'error': 'internal error', 'detail': str(e)}), 500
+    return jsonify({'status': 'deleted'})
 
 
 
@@ -291,11 +291,11 @@ def delete_product(product_id):
 @app.route('/api/orders', methods=['GET'])
 def list_orders():
     # ... (Logic) ...
-	if not is_admin_logged_in():
-		return jsonify({'error': 'unauthorized'}), 401
-	
-	orders = Order.query.order_by(Order.created_at.desc()).all()
-	return jsonify([o.to_dict() for o in orders])
+    if not is_admin_logged_in():
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+    return jsonify([o.to_dict() for o in orders])
 
 
 # --- App Start / DB Init ---
@@ -308,26 +308,26 @@ def list_orders():
 
 # We'll rely on the existing Render-specific logic to handle DB creation.
 if hasattr(app, 'before_serving'):
-	@app.before_serving
-	def ensure_tables_on_start():
-		with app.app_context():
-			try:
-				db.create_all()
-				logger.info('Database tables ensured (before_serving)')
-			except Exception:
-				logger.exception('Failed to create DB tables on startup (before_serving)')
+    @app.before_serving
+    def ensure_tables_on_start():
+        with app.app_context():
+            try:
+                db.create_all()
+                logger.info('Database tables ensured (before_serving)')
+            except Exception:
+                logger.exception('Failed to create DB tables on startup (before_serving)')
 else:
-	# Fallback: run once on first request per process
-	def _ensure_tables_once():
-		if not getattr(app, '_tables_ensured', False):
-			with app.app_context():
-				try:
-					db.create_all()
-					app._tables_ensured = True
-					logger.info('Database tables ensured (before_request fallback)')
-				except Exception:
-					logger.exception('Failed to create DB tables on startup (before_request fallback)')
+    # Fallback: run once on first request per process
+    def _ensure_tables_once():
+        if not getattr(app, '_tables_ensured', False):
+            with app.app_context():
+                try:
+                    db.create_all()
+                    app._tables_ensured = True
+                    logger.info('Database tables ensured (before_request fallback)')
+                except Exception:
+                    logger.exception('Failed to create DB tables on startup (before_request fallback)')
 
-	@app.before_request
-	def ensure_tables():
-		_ensure_tables_once()
+    @app.before_request
+    def ensure_tables():
+        _ensure_tables_once()
