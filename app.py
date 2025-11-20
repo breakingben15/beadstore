@@ -218,7 +218,11 @@ def list_products():
 
 @app.route('/api/products', methods=['POST'])
 def create_product():
-    # ... (Logic) ...
+    # Input Validation: Max Lengths
+    MAX_NAME_LENGTH = 200
+    MAX_URL_LENGTH = 1000
+    MAX_PRICE = 9999.99
+
 	if not is_admin_logged_in():
 		return jsonify({'error': 'unauthorized'}), 401
 
@@ -227,13 +231,25 @@ def create_product():
 	price = data.get('price')
 	image_url = data.get('imageUrl') or data.get('image_url')
 
+    # 1. Basic Presence Check
 	if not name or price is None:
-		return jsonify({'error': 'name and price required'}), 400
+		return jsonify({'error': 'Name and price required'}), 400
 
+    # 2. Type/Format Check for Price
 	try:
 		price_val = float(price)
 	except ValueError:
-		return jsonify({'error': 'invalid price'}), 400
+		return jsonify({'error': 'Invalid price format'}), 400
+
+    # 3. Value/Range Check
+	if price_val <= 0 or price_val > MAX_PRICE:
+		return jsonify({'error': f'Price must be between $0.01 and ${MAX_PRICE}'}), 400
+    
+    # 4. Length Check for Name and URL
+	if len(name) > MAX_NAME_LENGTH:
+		return jsonify({'error': f'Product name is too long (max {MAX_NAME_LENGTH} chars)'}), 400
+	if image_url and len(image_url) > MAX_URL_LENGTH:
+		return jsonify({'error': f'Image URL is too long (max {MAX_URL_LENGTH} chars)'}), 400
 
 	product = Product(name=name, price=price_val, image_url=image_url)
 	db.session.add(product)
