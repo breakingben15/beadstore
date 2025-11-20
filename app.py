@@ -300,21 +300,13 @@ def list_orders():
 
 # --- App Start / DB Init ---
 
-if __name__ == '__main__':
-    # ... (Run command) ...
-	# Ensure DB exists when running locally
-	with app.app_context():
-		try:
-			db.create_all()
-		except Exception:
-			pass
+# Removed the direct 'if __name__ == '__main__':' block to avoid conflicts 
+# with gunicorn's startup sequence on deployment servers.
 
-	debug = os.environ.get('FLASK_DEBUG', '1') == '1'
-	port = int(os.environ.get('PORT', os.environ.get('FLASK_RUN_PORT', 5000)))
-	app.run(host='127.0.0.1', port=port, debug=debug)
+# This block ensures that the database tables are created once, which is necessary
+# for deployment environments like Render where the database lives external to the app.
 
-
-# ... (WSGI/Render specific setup unchanged) ...
+# We'll rely on the existing Render-specific logic to handle DB creation.
 if hasattr(app, 'before_serving'):
 	@app.before_serving
 	def ensure_tables_on_start():
